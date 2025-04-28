@@ -440,10 +440,13 @@ class Atlas {
   ///
   /// Throws an [Exception] in case the atlas could not be loaded.
   static Future<Atlas> fromAsset(String atlasFileName,
-      {AssetBundle? bundle}) async {
+      {AssetBundle? bundle,
+      Future<Uint8List> Function(String name)? loadFile}) async {
     bundle ??= rootBundle;
-    return _load(atlasFileName,
-        (file) async => (await bundle!.load(file)).buffer.asUint8List());
+    return _load(
+        atlasFileName,
+        loadFile ??
+            (file) async => (await bundle!.load(file)).buffer.asUint8List());
   }
 
   /// Loads an [Atlas] from the file [atlasFileName].
