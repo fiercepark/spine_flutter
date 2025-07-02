@@ -504,14 +504,14 @@ class Atlas {
       final Pointer<Utf8> atlasPageFile =
           _bindings.spine_atlas_get_image_path(atlas, i).cast();
       late final Image image;
+      final imagePath = "$atlasDir/${atlasPageFile.toDartString()}";
       if (attachments == null) {
-        final imagePath = "$atlasDir/${atlasPageFile.toDartString()}";
         var imageData = await loadFile!(imagePath);
         final Codec codec = await instantiateImageCodec(imageData);
         final FrameInfo frameInfo = await codec.getNextFrame();
         image = frameInfo.image;
       } else {
-        image = attachments[atlasPageFile.toDartString()]!;
+        image = attachments[imagePath]!;
       }
       atlasPages.add(image);
 
