@@ -451,7 +451,7 @@ class Atlas {
   static Future<Atlas> fromBinary(
     String atlasFileName, {
     required Uint8List binary,
-    required Map<String, Uint8List> attachments,
+    required Map<String, Image> attachments,
   }) async {
     return _load(
       atlasFileName,
@@ -482,7 +482,7 @@ class Atlas {
     String atlasFileName, {
     Future<Uint8List> Function(String name)? loadFile,
     Uint8List? binary,
-    Map<String, Uint8List>? attachments,
+    Map<String, Image>? attachments,
   }) async {
     final atlasBytes = binary ?? await loadFile!(atlasFileName);
     final atlasData = convert.utf8.decode(atlasBytes);
@@ -503,17 +503,18 @@ class Atlas {
     for (int i = 0; i < numImagePaths; i++) {
       final Pointer<Utf8> atlasPageFile =
           _bindings.spine_atlas_get_image_path(atlas, i).cast();
-      Uint8List? imageData;
-      if (attachments != null) {
-        imageData = attachments[atlasPageFile.toDartString()];
-      } else {
+      late final Image image;
+      if (attachments == null) {
         final imagePath = "$atlasDir/${atlasPageFile.toDartString()}";
-        imageData = await loadFile!(imagePath);
+        var imageData = await loadFile!(imagePath);
+        final Codec codec = await instantiateImageCodec(imageData);
+        final FrameInfo frameInfo = await codec.getNextFrame();
+        image = frameInfo.image;
+      } else {
+        image = attachments[atlasPageFile.toDartString()]!;
       }
-      final Codec codec = await instantiateImageCodec(imageData!);
-      final FrameInfo frameInfo = await codec.getNextFrame();
-      final Image image = frameInfo.image;
       atlasPages.add(image);
+
       Map<BlendMode, Paint> paints = {};
       for (final blendMode in BlendMode.values) {
         paints[blendMode] = Paint()
