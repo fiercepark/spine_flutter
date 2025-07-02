@@ -443,10 +443,21 @@ class Atlas {
       {AssetBundle? bundle,
       Future<Uint8List> Function(String name)? loadFile}) async {
     bundle ??= rootBundle;
-    return _load(
-        atlasFileName,
-        loadFile ??
+    return _load(atlasFileName,
+        loadFile: loadFile ??
             (file) async => (await bundle!.load(file)).buffer.asUint8List());
+  }
+
+  static Future<Atlas> fromBinary(
+    String atlasFileName, {
+    required Uint8List binary,
+    required Map<String, Uint8List> attachments,
+  }) async {
+    return _load(
+      atlasFileName,
+      binary: binary,
+      attachments: attachments,
+    );
   }
 
   /// Loads an [Atlas] from the file [atlasFileName].
@@ -454,21 +465,26 @@ class Atlas {
   /// Throws an [Exception] in case the atlas could not be loaded.
   static Future<Atlas> fromFile(String atlasFileName,
       {Future<Uint8List> Function(String name)? loadFile}) async {
-    return _load(atlasFileName, loadFile ?? (file) => File(file).readAsBytes());
+    return _load(atlasFileName,
+        loadFile: loadFile ?? (file) => File(file).readAsBytes());
   }
 
   /// Loads an [Atlas] from the URL [atlasURL].
   ///
   /// Throws an [Exception] in case the atlas could not be loaded.
   static Future<Atlas> fromHttp(String atlasURL) async {
-    return _load(atlasURL, (file) async {
+    return _load(atlasURL, loadFile: (file) async {
       return (await http.get(Uri.parse(file))).bodyBytes;
     });
   }
 
-  static Future<Atlas> _load(String atlasFileName,
-      Future<Uint8List> Function(String name) loadFile) async {
-    final atlasBytes = await loadFile(atlasFileName);
+  static Future<Atlas> _load(
+    String atlasFileName, {
+    Future<Uint8List> Function(String name)? loadFile,
+    Uint8List? binary,
+    Map<String, Uint8List>? attachments,
+  }) async {
+    final atlasBytes = binary ?? await loadFile!(atlasFileName);
     final atlasData = convert.utf8.decode(atlasBytes);
     final atlasDataNative = atlasData.toNativeUtf8(allocator: _allocator);
     final atlas = _bindings.spine_atlas_load(atlasDataNative.cast());
@@ -487,9 +503,14 @@ class Atlas {
     for (int i = 0; i < numImagePaths; i++) {
       final Pointer<Utf8> atlasPageFile =
           _bindings.spine_atlas_get_image_path(atlas, i).cast();
-      final imagePath = "$atlasDir/${atlasPageFile.toDartString()}";
-      var imageData = await loadFile(imagePath);
-      final Codec codec = await instantiateImageCodec(imageData);
+      Uint8List? imageData;
+      if (attachments != null) {
+        imageData = attachments[atlasPageFile.toDartString()];
+      } else {
+        final imagePath = "$atlasDir/${atlasPageFile.toDartString()}";
+        imageData = await loadFile!(imagePath);
+      }
+      final Codec codec = await instantiateImageCodec(imageData!);
       final FrameInfo frameInfo = await codec.getNextFrame();
       final Image image = frameInfo.image;
       atlasPages.add(image);
